@@ -1,0 +1,1 @@
+this is a cicd amd github actions wbinar notes.
