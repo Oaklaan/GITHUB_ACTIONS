@@ -14,6 +14,13 @@ The project demonstrates a basic **CI/CD workflow** using:
 * ☁️ **AWS EC2** – Server used for hosting the website
 * 🌐 **HTML/CSS** – Simple website
 
+## 🌐 Live Demo
+
+The website is deployed on an AWS EC2 Ubuntu instance using
+GitHub Actions, a self-hosted runner, and Nginx.
+
+🔗 [GitHub to AWS EC2 Deployment](http://98.130.14.184/) 
+
 ### Architecture
 
 ```text
