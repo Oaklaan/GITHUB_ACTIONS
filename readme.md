@@ -21,6 +21,14 @@ GitHub Actions, a self-hosted runner, and Nginx.
 
 🔗 [GitHub to AWS EC2 Deployment](http://98.130.14.184/) 
 
+## ⚠️ Instance Status
+
+**Instance State:** `Stopped`
+
+> The AWS EC2 instance is currently stopped.
+> Please contact the owner to request access to the website or required resources.
+
+
 ### Architecture
 
 ```text
