@@ -19,7 +19,7 @@ The project demonstrates a basic **CI/CD workflow** using:
 The website is deployed on an AWS EC2 Ubuntu instance using
 GitHub Actions, a self-hosted runner, and Nginx.
 
-🔗 [GitHub to AWS EC2 Deployment](http://98.130.14.184/) 
+🔗 [GitHub to AWS EC2 Deployment](http://http://98.130.15.198/) 
 
 ## ⚠️ Instance Status
 
