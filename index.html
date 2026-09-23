@@ -1,313 +1,390 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>git push → deployed. A self-hosted CI/CD pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d1117;
+    --panel:#12181f;
+    --panel2:#161d26;
+    --border:#26303b;
+    --text:#d7dde3;
+    --muted:#828e99;
+    --amber:#f0923e;
+    --green:#3fb96f;
+    --red:#f0605a;
+    --font-head:'Space Grotesk', system-ui, sans-serif;
+    --font-mono:'JetBrains Mono', ui-monospace, Menlo, monospace;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-mono);
+    line-height:1.55;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size:64px 64px;
+    background-position:center top;
+    background-attachment:fixed;
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background:radial-gradient(ellipse 900px 500px at 50% -5%, rgba(240,146,62,.10), transparent 60%);
+    pointer-events:none;
+  }
+  a{color:var(--amber);}
+  .wrap{max-width:920px;margin:0 auto;padding:0 22px;position:relative;}
+  section{padding:64px 0;}
+  h1,h2,h3{font-family:var(--font-head);font-weight:600;margin:0;color:#eef1f4;}
 
-    <title>GitHub to AWS EC2 Deployment</title>
+  /* ---------- top bar ---------- */
+  header.top{
+    max-width:920px;margin:0 auto;padding:26px 22px 0;
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:13px;color:var(--muted);
+  }
+  header.top .brand{color:var(--text);}
+  header.top .brand b{color:var(--amber);}
 
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-        }
+  /* ---------- hero ---------- */
+  .hero{padding:56px 0 10px;text-align:left;}
+  .hero .kicker{color:var(--green);font-size:13px;margin-bottom:14px;}
+  .hero .kicker::before{content:"$ ";color:var(--muted);}
+  .hero h1{
+    font-size:clamp(30px,5.4vw,52px);
+    line-height:1.12;
+    max-width:15ch;
+    letter-spacing:-0.5px;
+  }
+  .hero .chain{
+    font-family:var(--font-mono);
+    color:var(--amber);
+    font-size:clamp(15px,2.1vw,19px);
+    margin-top:18px;
+    display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  }
+  .hero .chain span.step{color:#eef1f4;}
+  .hero .chain span.arrow{color:var(--muted);}
+  .hero p.sub{color:var(--muted);max-width:56ch;margin-top:20px;font-size:15px;}
 
-        body {
-            background: #f4f7fb;
-            color: #222;
-        }
+  .terminal{
+    margin-top:36px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    overflow:hidden;
+    box-shadow:0 20px 50px -20px rgba(0,0,0,.6);
+  }
+  .terminal .bar{
+    display:flex;align-items:center;gap:8px;
+    padding:10px 14px;border-bottom:1px solid var(--border);
+    background:var(--panel2);
+  }
+  .terminal .dot{width:10px;height:10px;border-radius:50%;}
+  .terminal .bar span.title{margin-left:8px;color:var(--muted);font-size:12px;}
+  .terminal .body{padding:18px 18px 22px;font-size:13.5px;min-height:190px;}
+  .terminal .line{white-space:pre-wrap;word-break:break-word;opacity:0;animation:appear .2s forwards;}
+  .terminal .ok{color:var(--green);}
+  .terminal .err{color:var(--red);}
+  .terminal .dim{color:var(--muted);}
+  .cursor{display:inline-block;width:8px;height:14px;background:var(--amber);vertical-align:-2px;animation:blink 1s steps(1) infinite;}
+  @keyframes appear{to{opacity:1;}}
+  @keyframes blink{50%{opacity:0;}}
 
-        header {
-            background: #111827;
-            color: white;
-            text-align: center;
-            padding: 35px 20px;
-        }
+  /* ---------- pipeline diagram ---------- */
+  .eyebrow{font-size:12px;color:var(--muted);margin-bottom:8px;}
+  h2.section-title{font-size:clamp(22px,3.4vw,30px);max-width:22ch;}
+  p.lede{color:var(--muted);max-width:60ch;margin-top:12px;font-size:14.5px;}
 
-        header h1 {
-            margin-bottom: 10px;
-        }
+  .pipeline{
+    margin-top:34px;
+    display:flex;
+    overflow-x:auto;
+    gap:0;
+    padding-bottom:8px;
+    -webkit-overflow-scrolling:touch;
+  }
+  .stage{
+    flex:0 0 auto;
+    width:198px;
+    padding:18px 16px;
+    border:1px solid var(--border);
+    background:var(--panel);
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .stage + .stage{border-left:none;}
+  .stage:first-child{border-radius:8px 0 0 8px;}
+  .stage:last-child{border-radius:0 8px 8px 0;}
+  .stage .n{font-family:var(--font-mono);color:var(--muted);font-size:12px;}
+  .stage h3{font-family:var(--font-head);font-size:15px;margin-top:8px;color:#eef1f4;}
+  .stage p{font-size:12.5px;color:var(--muted);margin:8px 0 0;min-height:48px;}
+  .stage.active{background:#1a2129;border-color:var(--amber);}
+  .stage.active .n{color:var(--amber);}
+  .pipe-note{font-size:12px;color:var(--muted);margin-top:12px;}
+  .pipe-note b{color:var(--amber);font-weight:500;}
 
-        header p {
-            color: #d1d5db;
-        }
+  /* ---------- incidents ---------- */
+  .incidents{margin-top:30px;background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .incident{
+    display:grid;grid-template-columns:110px 1fr;gap:16px;
+    padding:14px 18px;border-bottom:1px solid var(--border);font-size:13px;
+  }
+  .incident:last-child{border-bottom:none;}
+  .incident .tag{color:var(--red);}
+  .incident .tag.fixed{color:var(--green);}
+  .incident .desc{color:var(--text);}
+  .incident .desc small{display:block;color:var(--muted);margin-top:3px;}
 
-        .container {
-            max-width: 1000px;
-            margin: 40px auto;
-            padding: 20px;
-        }
+  /* ---------- stack list ---------- */
+  .stack{margin-top:30px;display:flex;flex-direction:column;}
+  .stack-item{
+    display:grid;grid-template-columns:34px 1fr;gap:18px;
+    padding:18px 0;border-top:1px solid var(--border);
+  }
+  .stack-item:last-child{border-bottom:1px solid var(--border);}
+  .stack-item .num{font-family:var(--font-head);color:var(--amber);font-size:14px;padding-top:2px;}
+  .stack-item h3{font-family:var(--font-head);font-size:16px;color:#eef1f4;}
+  .stack-item p{margin:6px 0 0;color:var(--muted);font-size:13.5px;max-width:62ch;}
 
-        .flow {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            flex-wrap: wrap;
-            margin-bottom: 40px;
-        }
+  /* ---------- takeaway ---------- */
+  .takeaway{
+    margin-top:34px;padding:28px 26px;border:1px solid var(--border);
+    border-left:3px solid var(--green);background:var(--panel);border-radius:0 8px 8px 0;
+  }
+  .takeaway p{font-family:var(--font-head);font-size:clamp(17px,2.4vw,21px);color:#eef1f4;margin:0;line-height:1.4;}
+  .takeaway p.result{margin-top:16px;font-family:var(--font-mono);font-size:13px;color:var(--green);}
 
-        .box {
-            background: white;
-            border: 2px solid #2563eb;
-            border-radius: 10px;
-            padding: 20px;
-            width: 200px;
-            text-align: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-        }
+  /* ---------- links / footer ---------- */
+  .links{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px;}
+  .links a{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:12px 18px;border:1px solid var(--border);border-radius:6px;
+    color:var(--text);text-decoration:none;font-size:13.5px;background:var(--panel);
+    transition:border-color .15s, color .15s;
+  }
+  .links a:hover{border-color:var(--amber);color:var(--amber);}
+  .links a b{color:var(--amber);}
+  .links a.live b{color:var(--green);}
+  .links a.live:hover{border-color:var(--green);color:var(--green);}
 
-        .box h3 {
-            margin-bottom: 8px;
-            color: #2563eb;
-        }
+  footer{border-top:1px solid var(--border);margin-top:20px;}
+  footer .wrap{padding:26px 22px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:12.5px;color:var(--muted);}
+  footer b{color:var(--text);}
 
-        .arrow {
-            font-size: 30px;
-            font-weight: bold;
-            color: #2563eb;
-        }
-
-        .steps {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-        }
-
-        .steps h2 {
-            margin-bottom: 25px;
-            text-align: center;
-        }
-
-        .step {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 25px;
-            padding: 20px;
-            border-left: 5px solid #2563eb;
-            background: #f8fafc;
-        }
-
-        .number {
-            background: #2563eb;
-            color: white;
-            min-width: 35px;
-            height: 35px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-        }
-
-        .step h3 {
-            margin-bottom: 8px;
-        }
-
-        code {
-            display: block;
-            background: #111827;
-            color: #e5e7eb;
-            padding: 12px;
-            border-radius: 6px;
-            margin-top: 10px;
-            overflow-x: auto;
-        }
-
-        .result {
-            margin-top: 30px;
-            padding: 20px;
-            background: #dcfce7;
-            border: 1px solid #22c55e;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        footer {
-            text-align: center;
-            padding: 25px;
-            margin-top: 30px;
-            background: #111827;
-            color: white;
-        }
-    </style>
+  @media (max-width:560px){
+    .incident{grid-template-columns:1fr;gap:4px;}
+    header.top{font-size:11.5px;}
+  }
+</style>
 </head>
-
 <body>
 
-    <header>
-        <h1>🚀 GitHub to AWS EC2 Deployment</h1>
-        <p>Simple demonstration of hosting a website using GitHub and an EC2 instance</p>
-    </header>
+<header class="top">
+  <div class="brand"><b>~/</b>deploy-pipeline</div>
+  <div>EC2 · nginx · gh-actions</div>
+</header>
 
-    <div class="container">
+<div class="wrap">
+  <section class="hero">
+    <div class="kicker">how it actually works</div>
+    <h1>git push → your website is live. No copying files by hand.</h1>
+    <div class="chain">
+      <span class="step">GitHub</span><span class="arrow">→</span>
+      <span class="step">Actions</span><span class="arrow">→</span>
+      <span class="step">Self-Hosted Runner</span><span class="arrow">→</span>
+      <span class="step">EC2</span><span class="arrow">→</span>
+      <span class="step">Nginx</span>
+    </div>
+    <p class="sub">A beginner question — "can GitHub deploy my site to a real AWS server without me copying files?" — turned into a working pipeline, a few broken deploys, and a real DevOps lesson in what happens between writing code and seeing it live.</p>
 
-        <!-- Deployment Flow -->
-        <div class="flow">
+    <div class="terminal">
+      <div class="bar">
+        <div class="dot" style="background:#f0605a"></div>
+        <div class="dot" style="background:#f0923e"></div>
+        <div class="dot" style="background:#3fb96f"></div>
+        <span class="title">deploy.yml — run log</span>
+      </div>
+      <div class="body" id="term"></div>
+    </div>
+  </section>
 
-            <div class="box">
-                <h3>💻 Local Machine</h3>
-                <p>Write website code</p>
-            </div>
+  <section id="pipeline">
+    <div class="eyebrow">01 — the pipeline</div>
+    <h2 class="section-title">Six stages, one push</h2>
+    <p class="lede">Every stage exists to hand the deploy off to the next one. Tap a stage to see what it's actually doing.</p>
 
-            <div class="arrow">→</div>
+    <div class="pipeline" id="pipeline-row">
+      <div class="stage active" data-i="0">
+        <div class="n">01</div>
+        <h3>GitHub</h3>
+        <p>Every change starts here — a commit pushed to the repo.</p>
+      </div>
+      <div class="stage" data-i="1">
+        <div class="n">02</div>
+        <h3>GitHub Actions</h3>
+        <p>Detects the push and kicks off the deployment workflow.</p>
+      </div>
+      <div class="stage" data-i="2">
+        <div class="n">03</div>
+        <h3>Self-Hosted Runner</h3>
+        <p>The bridge — the workflow executes directly on my own EC2, not somewhere unknown.</p>
+      </div>
+      <div class="stage" data-i="3">
+        <div class="n">04</div>
+        <h3>AWS EC2 (Ubuntu)</h3>
+        <p>The actual server — where the deploy commands run.</p>
+      </div>
+      <div class="stage" data-i="4">
+        <div class="n">05</div>
+        <h3>Nginx</h3>
+        <p>The front door — serves the deployed site to the outside world.</p>
+      </div>
+      <div class="stage" data-i="5">
+        <div class="n">06</div>
+        <h3>Browser</h3>
+        <p>HTML, CSS and JS — what the user actually sees.</p>
+      </div>
+    </div>
+    <p class="pipe-note">The real stack isn't a list of tools — it's <b>Code → Automation → Execution → Infrastructure → Web Server → User</b>.</p>
+  </section>
 
-            <div class="box">
-                <h3>🐙 GitHub</h3>
-                <p>Push source code</p>
-            </div>
+  <section id="broke">
+    <div class="eyebrow">02 — what actually broke</div>
+    <h2 class="section-title">The part tutorials skip</h2>
+    <p class="lede">The interesting work wasn't writing the workflow file. It was making every piece talk to the next one — and fixing it when they didn't.</p>
 
-            <div class="arrow">→</div>
+    <div class="incidents">
+      <div class="incident">
+        <div class="tag">deploy failed</div>
+        <div class="desc">First run didn't complete<small>Workflow triggered fine, but the deploy step exited before finishing.</small></div>
+      </div>
+      <div class="incident">
+        <div class="tag">permissions</div>
+        <div class="desc">Linux file permissions blocked the write<small>The runner user couldn't write into nginx's serving directory.</small></div>
+      </div>
+      <div class="incident">
+        <div class="tag">runner down</div>
+        <div class="desc">Self-hosted runner needed a restart<small>It stopped listening for new jobs and had to be brought back manually.</small></div>
+      </div>
+      <div class="incident">
+        <div class="tag">nginx config</div>
+        <div class="desc">Server block wasn't pointing at the right root<small>Small config fix — but it's the difference between 404 and a live page.</small></div>
+      </div>
+      <div class="incident">
+        <div class="tag fixed">resolved</div>
+        <div class="desc">Job deploy / build completed with result: Succeeded<small>Every fix here taught a bigger lesson than the tutorial did.</small></div>
+      </div>
+    </div>
+  </section>
 
-            <div class="box">
-                <h3>⚙️ GitHub Runner</h3>
-                <p>Run deployment commands</p>
-            </div>
+  <section id="stack">
+    <div class="eyebrow">03 — what powered it</div>
+    <h2 class="section-title">Each piece, one job</h2>
 
-            <div class="arrow">→</div>
-
-            <div class="box">
-                <h3>☁️ AWS EC2</h3>
-                <p>Host the website</p>
-            </div>
-
-        </div>
-
-
-        <!-- Steps -->
-        <div class="steps">
-
-            <h2>📋 Deployment Steps</h2>
-
-            <div class="step">
-                <div class="number">1</div>
-
-                <div>
-                    <h3>Create the Website</h3>
-                    <p>
-                        Create your HTML, CSS and JavaScript files on your
-                        local computer.
-                    </p>
-
-                    <code>
-                        index.html
-                    </code>
-                </div>
-            </div>
-
-
-            <div class="step">
-                <div class="number">2</div>
-
-                <div>
-                    <h3>Push Code to GitHub</h3>
-
-                    <p>
-                        Initialize Git and push your project to a GitHub repository.
-                    </p>
-
-                    <code>
-                        git init<br>
-                        git add .<br>
-                        git commit -m "Initial website"<br>
-                        git push origin main
-                    </code>
-                </div>
-            </div>
-
-
-            <div class="step">
-                <div class="number">3</div>
-
-                <div>
-                    <h3>Configure GitHub Runner</h3>
-
-                    <p>
-                        A GitHub Actions self-hosted runner can execute
-                        deployment commands on your infrastructure.
-                    </p>
-
-                    <code>
-                        GitHub Repository<br>
-                        ↓<br>
-                        GitHub Actions<br>
-                        ↓<br>
-                        Self-Hosted Runner
-                    </code>
-                </div>
-            </div>
-
-
-            <div class="step">
-                <div class="number">4</div>
-
-                <div>
-                    <h3>Prepare AWS EC2</h3>
-
-                    <p>
-                        Launch an EC2 instance and install a web server such
-                        as Apache or Nginx.
-                    </p>
-
-                    <code>
-                        sudo apt update<br>
-                        sudo apt install nginx -y
-                    </code>
-                </div>
-            </div>
-
-
-            <div class="step">
-                <div class="number">5</div>
-
-                <div>
-                    <h3>Deploy Website to EC2</h3>
-
-                    <p>
-                        Copy the website files to the web server directory.
-                    </p>
-
-                    <code>
-                        sudo cp index.html /var/www/html/
-                    </code>
-                </div>
-            </div>
-
-
-            <div class="step">
-                <div class="number">6</div>
-
-                <div>
-                    <h3>Access the Website</h3>
-
-                    <p>
-                        Open your EC2 public IPv4 address in a web browser.
-                    </p>
-
-                    <code>
-                        http://YOUR-EC2-PUBLIC-IP
-                    </code>
-                </div>
-            </div>
-
-            <div class="result">
-                <h3>🎉 Website Successfully Hosted!</h3>
-                <p>
-                    Local Code → GitHub → GitHub Runner → AWS EC2 → Website
-                </p>
-            </div>
-
-        </div>
-
+    <div class="stack">
+      <div class="stack-item">
+        <div class="num">01</div>
+        <div><h3>GitHub</h3><p>The starting point. Every code change begins here.</p></div>
+      </div>
+      <div class="stack-item">
+        <div class="num">02</div>
+        <div><h3>GitHub Actions</h3><p>The automation layer — detects the change and starts the deployment workflow.</p></div>
+      </div>
+      <div class="stack-item">
+        <div class="num">03</div>
+        <div><h3>Self-hosted runner</h3><p>The bridge — instead of deploying somewhere unknown, the workflow runs directly on my own EC2 environment.</p></div>
+      </div>
+      <div class="stack-item">
+        <div class="num">04</div>
+        <div><h3>AWS EC2 + Ubuntu</h3><p>The actual server — the place where the application lives and the deploy commands run.</p></div>
+      </div>
+      <div class="stack-item">
+        <div class="num">05</div>
+        <div><h3>Nginx</h3><p>The front door — serves the deployed website to the outside world.</p></div>
+      </div>
+      <div class="stack-item">
+        <div class="num">06</div>
+        <div><h3>HTML, CSS &amp; JavaScript</h3><p>What the user actually sees.</p></div>
+      </div>
     </div>
 
+    <div class="takeaway">
+      <p>The biggest takeaway wasn't "how to deploy a website" — it was understanding what happens between writing code and seeing that code live on a server.</p>
+      <p class="result">That gap is where CI/CD, Linux, cloud infrastructure, automation, permissions and troubleshooting all come together.</p>
+    </div>
+  </section>
 
-    <footer>
-        <p>Made with HTML & CSS | GitHub + AWS EC2 Deployment Demo</p>
-    </footer>
+  <section id="project">
+    <div class="eyebrow">04 — project</div>
+    <h2 class="section-title">One push. One pipeline. One deployed website.</h2>
+    <div class="links">
+      <a href="https://github.com/Oaklaan/GITHUB_ACTIONS" target="_blank" rel="noopener"><b>↗</b> Source — GITHUB_ACTIONS repo</a>
+      <a class="live" href="http://98.130.14.184/" target="_blank" rel="noopener"><b>●</b> Live demo — 98.130.14.184</a>
+    </div>
+  </section>
+</div>
 
+<footer>
+  <div class="wrap">
+    <span>Built by learning the concepts, then actually building them.</span>
+    <span>Inspired by <b>Shubham Londhe</b>'s DevOps explanations.</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var lines = [
+    {t:'$ git push origin main', c:''},
+    {t:'remote: Resolving deltas... done.', c:'dim'},
+    {t:'→ workflow "deploy.yml" triggered', c:'dim'},
+    {t:'→ self-hosted runner: job received', c:'dim'},
+    {t:'→ connecting to EC2 (Ubuntu)...', c:'dim'},
+    {t:'✗ permission denied: /var/www/html', c:'err'},
+    {t:'→ fixed ownership, retrying...', c:'dim'},
+    {t:'→ reloading nginx', c:'dim'},
+    {t:'✓ Job deploy / build completed with result: Succeeded', c:'ok'}
+  ];
+  var el = document.getElementById('term');
+  var i = 0;
+  function next(){
+    if(i >= lines.length){
+      var cur = document.createElement('span');
+      cur.className='cursor';
+      el.appendChild(cur);
+      return;
+    }
+    var d = document.createElement('div');
+    d.className = 'line ' + (lines[i].c||'');
+    d.textContent = lines[i].t;
+    el.appendChild(d);
+    i++;
+    setTimeout(next, i<=2 ? 260 : 420);
+  }
+  next();
+
+  var stages = document.querySelectorAll('.stage');
+  stages.forEach(function(s){
+    s.addEventListener('click', function(){
+      stages.forEach(function(x){x.classList.remove('active');});
+      s.classList.add('active');
+    });
+  });
+})();
+</script>
 </body>
 </html>
